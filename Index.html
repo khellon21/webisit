@@ -190,6 +190,53 @@
             color: var(--text-secondary);
             font-style: italic;
         }
+
+        /* Code block styling */
+        .code-block {
+            position: relative;
+            background: #1e1e1e;
+            border-radius: 8px;
+            margin: 10px 0;
+        }
+
+        .code-block pre {
+            margin: 0;
+            padding: 16px;
+            overflow-x: auto;
+            color: #e0e0e0;
+            font-family: 'Fira Code', 'Consolas', monospace;
+            font-size: 14px;
+        }
+
+        .copy-button {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            padding: 6px 12px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
+            color: #fff;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .copy-button:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: translateY(0);
+        }
+
+        .copy-button.copied {
+            background: var(--success-color);
+            border-color: var(--success-color);
+        }
+
+        /* Code syntax highlighting */
+        .code-block .keyword { color: #569CD6; }
+        .code-block .string { color: #CE9178; }
+        .code-block .comment { color: #6A9955; }
+        .code-block .function { color: #DCDCAA; }
     </style>
 </head>
 <body>
@@ -280,7 +327,14 @@
                         </div>
                     </div>`;
             } else {
-                messageDiv.textContent = text;
+                // Process the text to detect and format code blocks
+                const formattedText = formatMessage(text);
+                messageDiv.innerHTML = formattedText;
+                
+                // Add copy functionality to any code blocks
+                messageDiv.querySelectorAll('.copy-button').forEach(button => {
+                    button.addEventListener('click', handleCopyClick);
+                });
             }
             
             const id = Date.now();
@@ -290,6 +344,78 @@
             chatMessages.scrollTop = chatMessages.scrollHeight;
             
             return id;
+        }
+
+        function formatMessage(text) {
+            // Split the text into regular text and code blocks
+            const parts = text.split(/```(\w*)\n([\s\S]*?)```/g);
+            let formatted = '';
+            
+            for (let i = 0; i < parts.length; i++) {
+                if (i % 3 === 0) {
+                    // Regular text
+                    formatted += `<p>${formatRegularText(parts[i])}</p>`;
+                } else if (i % 3 === 1) {
+                    // Language identifier (if any)
+                    const language = parts[i] || 'plaintext';
+                    const code = parts[i + 1];
+                    formatted += createCodeBlock(code, language);
+                    i++; // Skip the next part since we've already used it
+                }
+            }
+            
+            return formatted;
+        }
+
+        function formatRegularText(text) {
+            // Convert line breaks to <br> tags and escape HTML
+            return text
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/\n/g, '<br>');
+        }
+
+        function createCodeBlock(code, language) {
+            return `
+                <div class="code-block" data-language="${language}">
+                    <pre><code>${highlightCode(code, language)}</code></pre>
+                    <button class="copy-button" data-code="${encodeURIComponent(code)}">
+                        Copy
+                    </button>
+                </div>
+            `;
+        }
+
+        function highlightCode(code, language) {
+            // Basic syntax highlighting (you can expand this or use a library like Prism.js)
+            return code
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/(".*?")/g, '<span class="string">$1</span>')
+                .replace(/(function|const|let|var|if|else|return)/g, '<span class="keyword">$1</span>')
+                .replace(/(\/\/.*)/g, '<span class="comment">$1</span>')
+                .replace(/(\w+)\(/g, '<span class="function">$1</span>(');
+        }
+
+        async function handleCopyClick(event) {
+            const button = event.target;
+            const code = decodeURIComponent(button.dataset.code);
+            
+            try {
+                await navigator.clipboard.writeText(code);
+                button.textContent = 'Copied!';
+                button.classList.add('copied');
+                
+                setTimeout(() => {
+                    button.textContent = 'Copy';
+                    button.classList.remove('copied');
+                }, 2000);
+            } catch (err) {
+                console.error('Failed to copy code:', err);
+                button.textContent = 'Failed to copy';
+            }
         }
 
         function removeMessage(id) {
